@@ -40,7 +40,6 @@ export const parseParquet = async (filePath) => {
 export const parseGoogleSheet = async (sheetUrl) => {
   try {
     const response = await axios.get(sheetUrl);
-    // Assuming the Google Sheets data is returned in a JSON-compatible format
     return response.data;
   } catch (err) {
     throw new Error(`Error fetching data from Google Sheets: ${err.message}`);

@@ -98,55 +98,6 @@ export const ingestData = async (req, res) => {
     res.status(400).send({ message: error.message });
   }
 };
-// Other controller functions remain unchanged...
-
-export const changeCell = async (req, res) => {
-  try {
-    const changes = req.body.changes; // Array of changes
-    console.log("Received changes:", req.body.changes);
-
-    const spreadsheet = await checkPermissions(
-      req.user._id,
-      req.params.id,
-      "editor"
-    );
-    if (!spreadsheet) return res.status(403).send("Forbidden");
-
-    changes.forEach(({ row, col, oldValue, newValue }) => {
-      const rowIndex = parseInt(row, 10); // Convert row to integer index
-      const colIndex = parseInt(col, 10); // Convert col to integer index
-
-      console.log(`Updating row ${rowIndex}, column ${colIndex}`);
-
-      let rowData = spreadsheet.data.get(String(rowIndex));
-      console.log("Current row data:", rowData);
-
-      if (!rowData) {
-        console.log(`Row ${rowIndex} not found, creating new row.`);
-        rowData = new Map(); // Create a new map if the row doesn't exist
-      }
-
-      const columnKeys = Array.from(rowData.keys());
-      const targetColumnKey = columnKeys[colIndex];
-
-      if (targetColumnKey === undefined) {
-        console.log(`Column index ${colIndex} out of bounds`);
-        return res.status(400).send("Column index out of bounds");
-      }
-
-      rowData.set(targetColumnKey, newValue); // Update the specific cell
-      spreadsheet.data.set(String(rowIndex), rowData); // Reassign the updated row
-    });
-
-    // Mark the `data` field as modified to ensure Mongoose tracks the changes
-    spreadsheet.markModified("data");
-
-    await spreadsheet.save();
-    res.send("Cells updated");
-  } catch (error) {
-    res.status(400).send(error.message);
-  }
-};
 
 export const deleteSpreadsheet = async (req, res) => {
   try {
