@@ -1,7 +1,9 @@
 import csvParser from "csv-parser";
 import fs from "fs";
-import { parse } from "parquetjs-lite"; // For Parquet files
-import axios from "axios"; // For fetching data from Google Sheets
+import pkg from "parquetjs-lite";
+import axios from "axios";
+
+const { ParquetReader } = pkg;
 
 // Parse CSV
 export const parseCSV = (filePath) => {
@@ -11,21 +13,26 @@ export const parseCSV = (filePath) => {
       .pipe(csvParser())
       .on("data", (data) => results.push(data))
       .on("end", () => resolve(results))
-      .on("error", (err) => reject(err));
+      .on("error", (err) => reject(`Error parsing CSV file: ${err.message}`));
   });
 };
 
 // Parse Parquet
 export const parseParquet = async (filePath) => {
   try {
-    const reader = await parse(filePath);
+    const reader = await ParquetReader.openFile(filePath);
+    const cursor = reader.getCursor();
     const rows = [];
-    while (reader.hasNext()) {
-      rows.push(await reader.next());
+
+    let record = null;
+    while ((record = await cursor.next())) {
+      rows.push(record);
     }
+
+    await reader.close();
     return rows;
   } catch (err) {
-    throw new Error("Error parsing Parquet file");
+    throw new Error(`Error parsing Parquet file: ${err.message}`);
   }
 };
 
@@ -33,10 +40,10 @@ export const parseParquet = async (filePath) => {
 export const parseGoogleSheet = async (sheetUrl) => {
   try {
     const response = await axios.get(sheetUrl);
-    // Assuming data is in a JSON-compatible format (e.g., Google Sheets API response)
+    // Assuming the Google Sheets data is returned in a JSON-compatible format
     return response.data;
   } catch (err) {
-    throw new Error("Error fetching data from Google Sheets");
+    throw new Error(`Error fetching data from Google Sheets: ${err.message}`);
   }
 };
 
@@ -45,13 +52,13 @@ export const parseJSON = (filePath) => {
   return new Promise((resolve, reject) => {
     fs.readFile(filePath, "utf8", (err, data) => {
       if (err) {
-        return reject(err);
+        return reject(`Error reading JSON file: ${err.message}`);
       }
       try {
         const jsonData = JSON.parse(data);
         resolve(jsonData);
       } catch (parseError) {
-        reject("Error parsing JSON file");
+        reject(`Error parsing JSON file: ${parseError.message}`);
       }
     });
   });

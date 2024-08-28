@@ -7,6 +7,31 @@ import {
 } from "../helpers/fileParser.js";
 import { checkPermissions } from "../helpers/permissionChecker.js";
 
+export const fetchSpreadsheets = async (req, res) => {
+  try {
+    const spreadsheets = await Spreadsheet.find({ owner: req.user._id });
+    res.status(200).send(spreadsheets);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+};
+
+// Fetch a specific spreadsheet by ID
+export const fetchSpreadsheet = async (req, res) => {
+  try {
+    const spreadsheet = await Spreadsheet.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+
+    if (!spreadsheet) return res.status(404).send("Spreadsheet not found");
+
+    res.status(200).send(spreadsheet);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+};
+
 // Create Spreadsheet
 export const createSpreadsheet = async (req, res) => {
   try {
@@ -29,6 +54,7 @@ export const ingestData = async (req, res) => {
       req.params.id,
       "editor"
     );
+
     if (!spreadsheet) return res.status(403).send("Forbidden");
 
     let data;
@@ -51,21 +77,34 @@ export const ingestData = async (req, res) => {
       return res.status(400).send("No file or URL provided");
     }
 
+    if (!spreadsheet.data) {
+      spreadsheet.data = new Map();
+    }
+
+    // Convert index to string to ensure string keys in Map
     data.forEach((row, index) => {
-      spreadsheet.data.set(index, row);
+      const rowMap = new Map(Object.entries(row)); // Convert object to Map
+      spreadsheet.data.set(index.toString(), rowMap);
     });
+
     await spreadsheet.save();
-    res.send("Data ingested");
+
+    // Send back the data to be rendered properly
+    res.status(200).send({
+      message: "Data ingested successfully",
+      data: Array.from(spreadsheet.data.entries()), // Convert Map to array for JSON serialization
+    });
   } catch (error) {
-    res.status(400).send(error.message);
+    res.status(400).send({ message: error.message });
   }
 };
-
 // Other controller functions remain unchanged...
 
 export const changeCell = async (req, res) => {
   try {
-    const { row, column, value } = req.body;
+    const changes = req.body.changes; // Array of changes
+    console.log("Received changes:", req.body.changes);
+
     const spreadsheet = await checkPermissions(
       req.user._id,
       req.params.id,
@@ -73,12 +112,37 @@ export const changeCell = async (req, res) => {
     );
     if (!spreadsheet) return res.status(403).send("Forbidden");
 
-    spreadsheet.data.set(row, {
-      ...spreadsheet.data.get(row),
-      [column]: value,
+    changes.forEach(({ row, col, oldValue, newValue }) => {
+      const rowIndex = parseInt(row, 10); // Convert row to integer index
+      const colIndex = parseInt(col, 10); // Convert col to integer index
+
+      console.log(`Updating row ${rowIndex}, column ${colIndex}`);
+
+      let rowData = spreadsheet.data.get(String(rowIndex));
+      console.log("Current row data:", rowData);
+
+      if (!rowData) {
+        console.log(`Row ${rowIndex} not found, creating new row.`);
+        rowData = new Map(); // Create a new map if the row doesn't exist
+      }
+
+      const columnKeys = Array.from(rowData.keys());
+      const targetColumnKey = columnKeys[colIndex];
+
+      if (targetColumnKey === undefined) {
+        console.log(`Column index ${colIndex} out of bounds`);
+        return res.status(400).send("Column index out of bounds");
+      }
+
+      rowData.set(targetColumnKey, newValue); // Update the specific cell
+      spreadsheet.data.set(String(rowIndex), rowData); // Reassign the updated row
     });
+
+    // Mark the `data` field as modified to ensure Mongoose tracks the changes
+    spreadsheet.markModified("data");
+
     await spreadsheet.save();
-    res.send("Cell updated");
+    res.send("Cells updated");
   } catch (error) {
     res.status(400).send(error.message);
   }

@@ -6,6 +6,8 @@ import {
   changeCell,
   deleteSpreadsheet,
   manageCollaborators,
+  fetchSpreadsheets, // Add this
+  fetchSpreadsheet, // Add this
   removeCollaborator,
 } from "../controllers/spreadsheetController.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
@@ -32,5 +34,8 @@ router.delete(
   authMiddleware,
   removeCollaborator
 );
+
+router.get("/spreadsheets", authMiddleware, fetchSpreadsheets); // Fetch all spreadsheets
+router.get("/spreadsheets/:id", authMiddleware, fetchSpreadsheet); // Fetch a specific spreadsheet by ID
 
 export default router;
