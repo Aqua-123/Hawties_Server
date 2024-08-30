@@ -1,16 +1,41 @@
-import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
+import { auth } from "../helpers/firebaseService.js";
 
 const authMiddleware = async (req, res, next) => {
-  const token = req.header("Authorization").replace("Bearer ", "");
+  const token = req.headers.authorization?.split(" ")[1];
+  const apiKey = req.headers["api-subscription-key"];
+
+  if (!token && !apiKey) {
+    return res.status(401).json({ error: "Not authorized" });
+  }
+
   try {
-    const decoded = jwt.verify(token, "blablabla");
-    const user = await User.findById(decoded.id);
-    if (!user) throw new Error();
+    let user;
+
+    if (token) {
+      const decodedToken = await auth.verifyIdToken(token);
+      user = await User.findOne({ firebaseUid: decodedToken.uid });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+    }
+
+    if (!user && apiKey) {
+      user = await User.findOne({ APIKey: apiKey });
+
+      if (!user) {
+        return res.status(404).json({ error: "Invalid API key" });
+      }
+    }
+
     req.user = user;
+    req.user.uid = user.firebaseUid;
+    req.user.userId = user._id;
     next();
-  } catch (error) {
-    res.status(401).send({ error: "Please authenticate." });
+  } catch (err) {
+    console.error("Authentication error:", err);
+    res.status(401).json({ error: "Not authorized" });
   }
 };
 

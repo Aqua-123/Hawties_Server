@@ -3,7 +3,11 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 export const signUp = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, uid, photoURL } = req.body;
+
+  if (!email || !uid) {
+    return res.status(400).json({ error: "Missing email or UID" });
+  }
 
   try {
     let user = await User.findOne({ email });
@@ -11,8 +15,7 @@ export const signUp = async (req, res) => {
       return res.status(400).json({ msg: "User already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user = new User({ name, email, password: hashedPassword });
+    user = new User({ name, email, firebaseUid: uid, photoURL });
 
     await user.save();
 
