@@ -12,9 +12,6 @@ const SpreadsheetSchema = new Schema({
       role: { type: String, enum: ["viewer", "editor"], default: "viewer" },
     },
   ],
-  isDirectory: { type: Boolean, default: false }, // New field to indicate if this is a folder or a file
-  parent: { type: Schema.Types.ObjectId, ref: "Spreadsheet" }, // New field to reference the parent folder
-  items: [{ type: Schema.Types.ObjectId, ref: "Spreadsheet" }], // New field to store references to children (subfolders and files)
 });
 
 const Spreadsheet = mongoose.model("Spreadsheet", SpreadsheetSchema);

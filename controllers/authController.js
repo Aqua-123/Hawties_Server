@@ -58,3 +58,27 @@ export const signIn = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+import User from "../models/userModel.js";
+import Spreadsheet from "../models/spreadsheetModel.js";
+
+export const getUserData = async (req, res) => {
+  const { email } = req.params;
+
+  try {
+    // Find the user by email and populate their spreadsheets with metadata only (excluding the 'data' field)
+    const user = await User.findOne({ email }).populate({
+      path: "spreadsheets",
+      select: "name owner collaborators", // Exclude 'data' to only return metadata
+    });
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};

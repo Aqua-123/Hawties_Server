@@ -6,24 +6,29 @@ import {
   parseJSON,
 } from "../helpers/fileParser.js";
 import { checkPermissions } from "../helpers/permissionChecker.js";
+
 const ROW_INIT_COUNT = 12500;
 const COL_INIT_COUNT = 100;
 
+// Fetch all spreadsheets owned by the user
 export const fetchSpreadsheets = async (req, res) => {
   try {
-    const spreadsheets = await Spreadsheet.find({ owner: req.user._id });
+    const spreadsheets = await Spreadsheet.find({ owner: req.user._id }).select(
+      "name owner collaborators"
+    );
     res.status(200).send(spreadsheets);
   } catch (error) {
     res.status(400).send(error.message);
   }
 };
 
+// Fetch a specific spreadsheet by its ID and owner
 export const fetchSpreadsheet = async (req, res) => {
   try {
     const spreadsheet = await Spreadsheet.findOne({
       _id: req.params.id,
       owner: req.user._id,
-    });
+    }).select("name owner collaborators data");
 
     if (!spreadsheet) return res.status(404).send("Spreadsheet not found");
 
@@ -33,10 +38,10 @@ export const fetchSpreadsheet = async (req, res) => {
   }
 };
 
-// Create Spreadsheet
+// Create a new spreadsheet
 export const createSpreadsheet = async (req, res) => {
   try {
-    // Initialize a 500x500 grid with empty strings
+    // Initialize a grid with empty strings
     const data = new Map();
     for (let i = 0; i < ROW_INIT_COUNT; i++) {
       const rowMap = new Map();
@@ -69,7 +74,7 @@ export const createSpreadsheet = async (req, res) => {
   }
 };
 
-// Ingest Data in Bulk
+// Ingest data in bulk into a spreadsheet
 export const ingestData = async (req, res) => {
   try {
     const spreadsheet = await checkPermissions(
@@ -118,6 +123,7 @@ export const ingestData = async (req, res) => {
   }
 };
 
+// Delete a spreadsheet or folder, including its contents
 export const deleteSpreadsheet = async (req, res) => {
   try {
     const spreadsheet = await checkPermissions(
@@ -147,6 +153,8 @@ export const deleteSpreadsheet = async (req, res) => {
     res.status(400).send(error.message);
   }
 };
+
+// Add a collaborator to a spreadsheet
 export const manageCollaborators = async (req, res) => {
   try {
     const spreadsheet = await checkPermissions(
@@ -165,6 +173,7 @@ export const manageCollaborators = async (req, res) => {
   }
 };
 
+// Remove a collaborator from a spreadsheet
 export const removeCollaborator = async (req, res) => {
   try {
     const spreadsheet = await checkPermissions(
@@ -179,69 +188,6 @@ export const removeCollaborator = async (req, res) => {
     );
     await spreadsheet.save();
     res.send("Collaborator removed");
-  } catch (error) {
-    res.status(400).send(error.message);
-  }
-};
-
-export const createFolder = async (req, res) => {
-  try {
-    const folder = new Spreadsheet({
-      name: req.body.name,
-      owner: req.user._id,
-      isDirectory: true,
-      parent: req.body.parentId || null,
-    });
-
-    if (req.body.parentId) {
-      const parentFolder = await Spreadsheet.findById(req.body.parentId);
-      if (!parentFolder || !parentFolder.isDirectory) {
-        return res.status(400).send("Invalid parent folder");
-      }
-      parentFolder.items.push(folder._id);
-      await parentFolder.save();
-    }
-
-    await folder.save();
-    res.status(201).send(folder);
-  } catch (error) {
-    res.status(400).send(error.message);
-  }
-};
-
-export const fetchFolderContents = async (req, res) => {
-  try {
-    const folder = await Spreadsheet.findOne({
-      _id: req.params.id,
-      owner: req.user._id,
-      isDirectory: true,
-    });
-
-    if (!folder) return res.status(404).send("Folder not found");
-
-    const contents = await Spreadsheet.find({
-      parent: req.params.id,
-      owner: req.user._id,
-    });
-    res.status(200).send(contents);
-  } catch (error) {
-    res.status(400).send(error.message);
-  }
-};
-
-export const renameItem = async (req, res) => {
-  try {
-    const item = await Spreadsheet.findOne({
-      _id: req.params.id,
-      owner: req.user._id,
-    });
-
-    if (!item) return res.status(404).send("Item not found");
-
-    item.name = req.body.name || item.name; // Update the name if provided
-    await item.save();
-
-    res.status(200).send({ message: "Item renamed successfully", item });
   } catch (error) {
     res.status(400).send(error.message);
   }
