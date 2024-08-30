@@ -38,36 +38,25 @@ export const fetchSpreadsheet = async (req, res) => {
   }
 };
 
-// Create a new spreadsheet
 export const createSpreadsheet = async (req, res) => {
   try {
-    // Initialize a grid with empty strings
     const data = new Map();
     for (let i = 0; i < ROW_INIT_COUNT; i++) {
       const rowMap = new Map();
       for (let j = 0; j < COL_INIT_COUNT; j++) {
-        rowMap.set(j.toString(), ""); // Set each cell to an empty string
+        rowMap.set(j.toString(), "");
       }
-      data.set(i.toString(), rowMap); // Set each row map in the main data map
+      data.set(i.toString(), rowMap);
     }
 
     const spreadsheet = new Spreadsheet({
       name: req.body.name,
       owner: req.user._id,
       data: data,
-      parent: req.body.parentId || null, // Reference the parent folder if provided
     });
 
-    if (req.body.parentId) {
-      const parentFolder = await Spreadsheet.findById(req.body.parentId);
-      if (!parentFolder || !parentFolder.isDirectory) {
-        return res.status(400).send("Invalid parent folder");
-      }
-      parentFolder.items.push(spreadsheet._id);
-      await parentFolder.save();
-    }
-
     await spreadsheet.save();
+    req.user.spreadsheets.push(spreadsheet._id);
     res.status(201).send(spreadsheet);
   } catch (error) {
     res.status(400).send(error.message);
@@ -123,7 +112,7 @@ export const ingestData = async (req, res) => {
   }
 };
 
-// Delete a spreadsheet or folder, including its contents
+// Delete a spreadsheet
 export const deleteSpreadsheet = async (req, res) => {
   try {
     const spreadsheet = await checkPermissions(
@@ -133,22 +122,8 @@ export const deleteSpreadsheet = async (req, res) => {
     );
     if (!spreadsheet) return res.status(403).send("Forbidden");
 
-    // Recursively delete all items if it's a folder
-    if (spreadsheet.isDirectory) {
-      const deleteItems = async (items) => {
-        for (const itemId of items) {
-          const item = await Spreadsheet.findById(itemId);
-          if (item.isDirectory) {
-            await deleteItems(item.items);
-          }
-          await item.deleteOne();
-        }
-      };
-      await deleteItems(spreadsheet.items);
-    }
-
     await spreadsheet.deleteOne();
-    res.send("Spreadsheet/folder deleted");
+    res.send("Spreadsheet deleted");
   } catch (error) {
     res.status(400).send(error.message);
   }

@@ -1,4 +1,5 @@
 import User from "../models/userModel.js";
+import Spreadsheet from "../models/spreadsheetModel.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
@@ -59,24 +60,38 @@ export const signIn = async (req, res) => {
   }
 };
 
-import User from "../models/userModel.js";
-import Spreadsheet from "../models/spreadsheetModel.js";
-
 export const getUserData = async (req, res) => {
-  const { email } = req.params;
+  const { email } = req.user;
 
   try {
-    // Find the user by email and populate their spreadsheets with metadata only (excluding the 'data' field)
-    const user = await User.findOne({ email }).populate({
-      path: "spreadsheets",
-      select: "name owner collaborators", // Exclude 'data' to only return metadata
-    });
+    // Find the user by email
+    const user = await User.findOne({ email });
 
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    res.json(user);
+    // Fetch spreadsheets owned by the user
+    const ownedSpreadsheets = await Spreadsheet.find({
+      owner: user._id,
+    }).select("name owner collaborators");
+
+    // Fetch spreadsheets where the user is a collaborator (but not the owner)
+    const sharedSpreadsheets = await Spreadsheet.find({
+      collaborators: { $elemMatch: { email: user.email } },
+      owner: { $ne: user._id },
+    }).select("name owner collaborators");
+
+    // Return both lists in the response
+    res.json({
+      user: {
+        name: user.name,
+        email: user.email,
+        photoURL: user.photoURL,
+      },
+      ownedSpreadsheets,
+      sharedSpreadsheets,
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
