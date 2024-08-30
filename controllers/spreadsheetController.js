@@ -7,7 +7,7 @@ import {
 } from "../helpers/fileParser.js";
 import { checkPermissions } from "../helpers/permissionChecker.js";
 
-const ROW_INIT_COUNT = 12500;
+const ROW_INIT_COUNT = 10000;
 const COL_INIT_COUNT = 100;
 
 // Fetch all spreadsheets owned by the user
